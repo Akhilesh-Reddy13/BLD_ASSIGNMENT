@@ -1,42 +1,73 @@
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const {
-    startBrowser,
-    captureScreenshot
+  startBrowser,
+  captureScreenshot,
+  click,
+  startStreaming
 } = require("./browserManager");
+
 
 const app = express();
 
-app.get("/start", async (req, res) => {
-    try {
-        await startBrowser();
+const server = http.createServer(app);
 
-        res.json({
-            success: true,
-            message: "Browser started"
-        });
-    } catch (err) {
-        console.error(err);
-
-        res.status(500).json({
-            success: false
-        });
-    }
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  }
 });
 
-app.get("/screenshot", async (req, res) => {
+startStreaming(io);
 
+app.get("/start", async (_req, res) => {
+  try {
+    await startBrowser();
+    res.status(200).json({ message: "Browser started" });
+  } catch (error) {
+    console.error("Failed to start browser:", error);
+    res.status(500).json({ error: "Failed to start browser" });
+  }
+});
+
+app.get("/screenshot", async (_req, res) => {
+  try {
     const image = await captureScreenshot();
 
     if (!image) {
-        return res.status(400).send("Browser not started");
+      return res.status(503).json({ error: "Browser is not ready" });
     }
 
-    res.send(`
-        <img src="data:image/png;base64,${image}" />
-    `);
+    res.setHeader("Content-Type", "image/png");
+    res.send(Buffer.from(image, "base64"));
+  } catch (error) {
+    console.error("Failed to capture screenshot:", error);
+    res.status(500).json({ error: "Failed to capture screenshot" });
+  }
 });
 
-app.listen(3000, () => {
-    console.log("Server running on port 3000");
+io.on("connection", (socket) => {
+
+  console.log("Client connected");
+
+  socket.on("start-browser", async () => {
+
+    await startBrowser();
+
+    socket.emit("browser-started");
+
+  });
+
+  socket.on("click", async ({ x, y }) => {
+
+    await click(x, y);
+
+  });
+
+});
+
+server.listen(3000, () => {
+  console.log("Running on port 3000");
 });

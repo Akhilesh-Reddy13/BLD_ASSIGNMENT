@@ -24,7 +24,7 @@ async function startBrowser() {
         height: 720
     });
 
-    await page.goto("https://store.steampowered.com/");
+    await page.goto("https://www.google.com/");
 
     console.log("Chromium launched successfully");
 }
@@ -66,11 +66,29 @@ async function stopBrowser() {
     }
 }
 
+function startStreaming(io) {
+
+  setInterval(async () => {
+
+    if (!page) return;
+
+    const image = await page.screenshot({
+      encoding: "base64",
+      type: "png"
+    });
+
+    io.emit("frame", image);
+
+  }, 200);
+
+}
+
 module.exports = {
     startBrowser,
     captureScreenshot,
     click,
     type,
     scroll,
-    stopBrowser
+    stopBrowser,
+    startStreaming
 };
